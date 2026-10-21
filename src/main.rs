@@ -62,12 +62,12 @@ async fn add_license_to_dir(license: &License) {
             license_body = license_body.replace("[fullname]", &name_from_input);
         }
     }
-    let mut current_dir = env::args().collect::<Vec<String>>()[0].to_string();
-    if current_dir == "target/debug/outspector" {
-        current_dir = ".".to_string();
-    }
+    let current_dir = env::current_dir().unwrap();
+    let current_dir = current_dir.to_str().unwrap();
+    let filename = PathBuf::from(&current_dir).join("LICENSE");
     println!("Adding license to: {current_dir}");
-    let filename = PathBuf::from(current_dir).join("LICENSE");
+    println!("License file will be: {filename:?}");
+
     let file_exist = std::fs::exists(&filename);
     match file_exist {
         Err(x) => {
