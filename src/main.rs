@@ -6,10 +6,10 @@ use tokio::fs;
 
 #[tokio::main]
 async fn main() {
-    get_cache_dir_ready();
+    // get_cache_dir_ready();
     let licenses = get_licenses().await;
 
-    println!("We have the folloing licenses to choose from:");
+    println!("We have the following licenses to choose from:");
     let mut index = 0;
     for license in licenses {
         println!("{index:>2}) {:<12} | {}", license.key, license.name);
@@ -17,16 +17,18 @@ async fn main() {
     }
 }
 
-fn get_cache_dir_ready() {
-    let project_dir = ProjectDirs::from("com", "th3fishmk", "outspector").unwrap();
-    let project_dir = project_dir.cache_dir();
-    println!("{:?}", project_dir);
-    std::fs::create_dir_all(project_dir).unwrap();
-}
+//
+// fn get_cache_dir_ready() {
+//     let project_dir = ProjectDirs::from("com", "th3fishmk", "outspector").unwrap();
+//     let project_dir = project_dir.cache_dir();
+//     // println!("{:?}", project_dir);
+// }
+
 
 async fn get_licenses() -> Root {
     let project_dir = ProjectDirs::from("com", "th3fishmk", "outspector").unwrap();
     let project_dir = project_dir.cache_dir();
+    std::fs::create_dir_all(project_dir).unwrap();
 
     let root_license_file = Path::new(project_dir).join("licenses");
     let content = fs::read_to_string(&root_license_file).await;
@@ -38,7 +40,14 @@ async fn get_licenses() -> Root {
         }
         Ok(x) => {
             println!("License file found, reusing licenses");
-            serde_json::from_str(x.as_str()).unwrap()
+            let file_content = serde_json::from_str(x.as_str());
+            match file_content {
+                Err(_) => {
+                    println!("Error reading the file content, getting remote licenses");
+                    get_remote_licenses(&root_license_file).await
+                }
+                Ok(x) => x,
+            }
         }
     }
 }
@@ -51,7 +60,7 @@ async fn get_remote_licenses(save_file: &PathBuf) -> Root {
 
     let data: Root = client
         .get("https://api.github.com/licenses")
-        .header("User-Agent", "my-cli/1.0")
+        .header("User-Agent", "outspector/1.0")
         .header("Accept", "application/vnd.github+json")
         .header("X-GitHub-Api-Version", "2026-03-10")
         .send()
@@ -70,7 +79,6 @@ async fn get_remote_licenses(save_file: &PathBuf) -> Root {
             println!("Licenses saved for future usage on: {:?}", save_file)
         }
     }
-
     data
 }
 
