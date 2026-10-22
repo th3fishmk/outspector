@@ -1,3 +1,4 @@
+use crate::inter::{License, Licenses};
 use chrono::prelude::*;
 use directories::ProjectDirs;
 use std::{
@@ -6,15 +7,43 @@ use std::{
     path::{Path, PathBuf},
 };
 use tokio::fs;
-
-use crate::inter::{License, Licenses};
 mod inter;
+
+// Exit codes:
+// 1 = IO error
+// 2 = Argument errors
 
 #[tokio::main]
 async fn main() {
     let licenses = get_licenses().await;
 
+    let args: Vec<String> = env::args().collect();
+    if args.len() == 1 {
+        choose_license(licenses).await;
+    } else if args.len() == 2 {
+        let user_request = &args[1];
+        println!("Looking for the following license: {}", args[1]);
+        let target_license: Vec<_> = licenses.iter().filter(|f| f.key == *user_request).collect();
+        if target_license.len() == 1 {
+            println!(
+                "Found the license: {} : {:?}",
+                target_license[0].key, target_license[0].name
+            );
+            let license = get_license(&target_license[0].key).await;
+            add_license_to_dir(&license).await;
+        } else {
+            eprintln!("License {} was not found", args[1]);
+            std::process::exit(2)
+        }
+    } else {
+        eprintln!("Invalid arguments!");
+        std::process::exit(2)
+    }
+}
+
+async fn choose_license(licenses: Vec<Licenses>) {
     println!("We have the following licenses to choose from:");
+    println!("{:>2}  {:<12} | {}", "ID", "Key", "Name");
     for (index, license) in licenses.iter().enumerate() {
         println!("{index:>2}) {:<12} | {}", license.key, license.name);
     }
@@ -61,15 +90,20 @@ async fn add_license_to_dir(license: &License) {
     let file_exist = std::fs::exists(&filename);
     match file_exist {
         Err(x) => {
-            panic!("{}", x)
+            eprintln!("We encounter an error while trying to save the file: {}", x);
+            std::process::exit(1)
         }
         Ok(x) => {
             if x {
-                panic!("The file {:?} already exist!", x)
+                eprintln!("The file {:?} already exist!", filename);
+                std::process::exit(1)
             } else {
                 let saving = fs::write(filename, license_body).await;
                 match saving {
-                    Err(x) => println!("Error: {}", x),
+                    Err(x) => {
+                        eprintln!("Error: {}", x);
+                        std::process::exit(1)
+                    }
                     Ok(()) => println!("License file successfully created!"),
                 }
             }
@@ -79,7 +113,7 @@ async fn add_license_to_dir(license: &License) {
 
 fn ask_for_selection(max: usize) -> usize {
     println!();
-    print!("Select a license number (0-{}): ", max - 1);
+    print!("Select a license number(id) (0-{}): ", max - 1);
     let _ = std::io::stdout().flush();
     let mut selection = String::new();
     std::io::stdin()
