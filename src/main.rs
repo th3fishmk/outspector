@@ -1,4 +1,4 @@
-use crate::inter::{License, Licenses};
+use crate::interfaces::{License, Licenses};
 use chrono::prelude::*;
 use directories::ProjectDirs;
 use std::{
@@ -7,7 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 use tokio::fs;
-mod inter;
+mod interfaces;
 
 // Exit codes:
 // 1 = IO error
