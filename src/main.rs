@@ -43,7 +43,7 @@ async fn main() {
 
 async fn choose_license(licenses: Vec<Licenses>) {
     println!("We have the following licenses to choose from:");
-    println!("{:>2}  {:<12} | {}", "ID", "Key", "Name");
+    println!("{:>2}  {:<12} | Name", "ID", "Key");
     for (index, license) in licenses.iter().enumerate() {
         println!("{index:>2}) {:<12} | {}", license.key, license.name);
     }
@@ -84,8 +84,7 @@ async fn add_license_to_dir(license: &License) {
             license_body = license_body.replace("[fullname]", &name_from_input);
         }
     }
-    let current_dir = env::current_dir().unwrap();
-    let current_dir = current_dir.to_str().unwrap();
+    let current_dir = env::current_dir().expect("Error getting the current directory");
     let filename = PathBuf::from(&current_dir).join("LICENSE");
     let file_exist = std::fs::exists(&filename);
     match file_exist {
@@ -131,14 +130,14 @@ fn ask_for_selection(max: usize) -> usize {
 }
 
 async fn get_licenses() -> Vec<Licenses> {
-    let project_dir = ProjectDirs::from("com", "th3fishmk", "outspector").unwrap();
+    let project_dir = ProjectDirs::from("com", "th3fishmk", "outspector")
+        .expect("No valid home directory path could be retrieved from the operating system.");
     let project_dir = project_dir.cache_dir();
     let root_license_file = Path::new(project_dir).join("licenses");
-
     let content = fs::read_to_string(&root_license_file).await;
     match content {
         Err(_) => {
-            std::fs::create_dir_all(project_dir).unwrap();
+            std::fs::create_dir_all(project_dir).expect("Error trying to create a cache dir.");
             // println!("Getting remote licenses");
             get_remote_licenses(&root_license_file).await
         }
@@ -147,7 +146,8 @@ async fn get_licenses() -> Vec<Licenses> {
             let file_content = serde_json::from_str(x.as_str());
             match file_content {
                 Err(_) => {
-                    std::fs::create_dir_all(project_dir).unwrap();
+                    std::fs::create_dir_all(project_dir)
+                        .expect("Error trying to create a cache dir.");
                     // println!("Error reading the file content, getting remote licenses");
                     get_remote_licenses(&root_license_file).await
                 }
@@ -161,7 +161,7 @@ async fn get_remote_licenses(save_file: &PathBuf) -> Vec<Licenses> {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(10))
         .build()
-        .unwrap();
+        .expect("Error trying to create a client");
 
     let data: Vec<Licenses> = client
         .get("https://api.github.com/licenses")
@@ -170,11 +170,11 @@ async fn get_remote_licenses(save_file: &PathBuf) -> Vec<Licenses> {
         .header("X-GitHub-Api-Version", "2026-03-10")
         .send()
         .await
-        .unwrap()
+        .expect("Error getting data from the github api.")
         .json()
         .await
-        .unwrap();
-    let content = serde_json::to_string(&data).unwrap();
+        .expect("Invalid json data.");
+    let content = serde_json::to_string(&data).expect("Error parsing json data.");
     let save = fs::write(&save_file, content).await;
     match save {
         Err(x) => {
@@ -188,14 +188,15 @@ async fn get_remote_licenses(save_file: &PathBuf) -> Vec<Licenses> {
 }
 
 async fn get_license(name: &str) -> License {
-    let project_dir = ProjectDirs::from("com", "th3fishmk", "outspector").unwrap();
+    let project_dir = ProjectDirs::from("com", "th3fishmk", "outspector")
+        .expect("No valid home directory path could be retrieved from the operating system.");
     let project_dir = project_dir.cache_dir();
     let target_license = Path::new(project_dir).join(name);
 
     let license = get_local_license(&target_license).await;
     match license {
         None => get_remote_license(name, &target_license).await,
-        Some(x) => serde_json::from_str(&x).unwrap(),
+        Some(x) => serde_json::from_str(&x).expect("Error parsing json data"),
     }
 }
 
@@ -209,7 +210,7 @@ async fn get_remote_license(name: &str, save_file: &PathBuf) -> License {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(10))
         .build()
-        .unwrap();
+        .expect("Error trying to create a client");
 
     let data: License = client
         .get(url)
@@ -218,11 +219,11 @@ async fn get_remote_license(name: &str, save_file: &PathBuf) -> License {
         .header("X-GitHub-Api-Version", "2026-03-10")
         .send()
         .await
-        .unwrap()
+        .expect("Error getting data from the github api.")
         .json()
         .await
-        .unwrap();
-    let content = serde_json::to_string(&data).unwrap();
+        .expect("Invalid json data.");
+    let content = serde_json::to_string(&data).expect("Error parsing json data.");
     let save = fs::write(&save_file, content).await;
     match save {
         Err(x) => {
